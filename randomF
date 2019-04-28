@@ -1,0 +1,108 @@
+import numpy as np
+import random
+
+
+class node:
+    def __init__(self, fea, value, results, right=None, left=None):
+        self.feature = fea
+        self.value = value
+        self.resluts = results
+        self.right = right
+        self.left = left
+
+
+def cal_gini(data):
+    total_sample = len(data)
+    if len(data) == 0:
+        return 0
+    labels = label_count(data)
+    gini = 0
+    for label in labels:
+        gini += pow(labels[label], 2)
+    gini = 1-float(gini)/pow(total_sample, 2)
+    return gini
+
+
+def label_count(data):
+    labelcnt = {}
+    for x in data:
+        label = x[len(x)-1]
+        if label not in labelcnt:
+            labelcnt[label] = 0
+        labelcnt[label] += 1
+    return labelcnt
+
+
+def build_tree(data):  #cart
+    if len(data) == 0:
+        return 0
+    currentgini = cal_gini(data)
+    bestgain = 0
+    bestcriteria = None
+    bestset = None
+    feature_num = len(data[0])-1
+    for fea in range(feature_num):
+        featurevalue = {}  #在此位置处可能的取值
+        for sample in data:
+            featurevalue[sample[fea]] = 1
+        for value in featurevalue.keys():
+            (set1,set2) = split_tree(data, fea, value)  #划分左右子树
+            nowgini = float(len(set1)*cal_gini(set1) + len(set2)*cal_gini(set2))/len(data)
+            gain = currentgini - nowgini
+            if gain > bestgain and len(set1) >0 and len(set2) >0:
+                bestgain = gain
+                bestcriteria = (fea, value)
+                bestset = (set1, set2)
+    if bestgain > 0:
+        right = build_tree(bestset[0])
+        left = build_tree(bestset[1])
+        return node(fea=bestcriteria[0], value=bestcriteria[1], right=right, left=left)
+
+
+def split_tree(data,fea,value):
+    set1 = []
+    set2 = []
+    for x in data:
+        if x[fea] >= value:
+            set1.append(x)
+        else:
+            set2.append(x)
+    return (set1,set2)
+
+
+def randon_forest_training(data,treenum):
+    tree_result = []
+    tree_feature = []
+    n = np.shape(data)[1]
+    if n > 2:
+        k = int(np.log(n-1,2))+1 #设置特征个数
+    else:
+        k = 1
+
+    for i in range(treenum):
+        datasample, feature = choose_sample(data, k)
+        tree = build_tree(data)
+        tree_result.append(tree)
+    tree_feature.append(feature)
+    return tree_result, tree_feature
+
+
+
+def choose_sample(data, k):
+#随机抽取m个样本，并放回，同时只保留K维特征
+    m, n = np.shape(data)
+    feature = []
+    for j in range(k):
+        feature.append(random.randint(0, n-2))
+    index = []
+    for i in range(m):
+        index.append(random.randint(0, m-1))
+
+    data_sample = []
+    for i in range(m):
+        data_tmp = []
+        for fea in feature:
+            data_tmp.append(data[i][fea])
+        data_tmp.append(data[i][-1])
+        data_sample.append(data_tmp)
+    return data_sample, feature
