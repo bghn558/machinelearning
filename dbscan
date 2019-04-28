@@ -1,0 +1,65 @@
+import numpy as np
+
+def dbscan(data,eps,minpts):
+    '''
+    input: data(mat)
+    eps(float) 半径
+    minpts(int) 半径内最少的数据点的个数
+    output：type（mat） 每个样本的类型：核心点，边界点和噪点
+    sub——class 每个样本点所属于的类别
+    '''
+    m = np.shape(data)[0]
+    types = np.mat(np.zeros((1, m)))  #用于区分核心点1，边界点0，噪音点-1
+    sub_class = np.mat(np.zeros((1, m)))
+    dealed = np.mat(np.zeros((m, 1)))  #用于判断该点是否处理过，0表示为处理
+    dis = distance(data)   #计算距离
+    number = 1
+    for i in range(m):  #对每一个点进行处理
+        if dealed[1,0] == 0:  #找到未处理的店
+            D = dis[i, ]   #找到第i个点到其他所有点的距离
+            ind = find_eps(D, eps)  #找到半径eps内所有的点
+            if len(ind) > 1 and len(ind) < minpts +1:   #区分点的类型 边界点
+                types[0, i] = 0
+                sub_class[0, i] = -1
+                dealed[i, 0] = 1
+            if len(ind) == 1:  #噪音点
+                types[0, i] = -1
+                sub_class[0, i] = -1
+                dealed[i, 0] =1
+            if len(ind) >= minpts + 1: #核心点
+                types[0, i] = 1
+                for x in ind:
+                    sub_class[0, x] = number
+                while len(ind) > 0:   #判断是否密度可达
+                    dealed[ind[0], 0] =1
+                    D = dis[ind[0], ]
+                    tmp = ind[0]
+                    del ind[0]
+                    ind1 = find_eps(D, eps)
+                    if len(ind1) > 1:
+                        for x in ind1:
+                            sub_class[0,x]=number
+                        if len(ind1) >= minpts +1:
+                            types[0, tmp] = 1
+                        else:
+                            types[0, tmp] = 0
+                        for j in range(len(ind1)):
+                            if dealed[ind1[j], 0] == 0:
+                                dealed[ind1[j], 0] = 1
+                                ind.append(ind1[j])
+                                sub_class[0, ind1] = number
+                number += 1
+    ind2 = ((sub_class == 0).nonzero())[1]        #最后处理未分类的点为噪音点
+    for x in ind2:
+        sub_class[0, x] = -1
+        types[0, x] = -1
+    return types, sub_class
+
+
+def find_eps(distance_D, eps):
+    ind = []
+    n = np.shape(distance_D)[1]
+    for j in range(n):
+        if distance_D[0,j] <= eps:
+            ind.append(j)
+    return ind
