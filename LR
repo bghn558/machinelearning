@@ -1,0 +1,37 @@
+import numpy as np
+
+
+def loaddata():
+    pass
+
+
+def sigmoid(x):
+    return 1/(1+np.exp(x))
+
+
+def gradadcent(datamat,classlabel):
+    datamatrix = np.mat(datamat)
+    labelmat = np.mat(classlabel).transpose()
+    m,n =np.shape(datamatrix)
+    alpha = 0.001
+    maxiteration = 500
+    weights = np.ones((n,1))
+    for k in range(maxiteration):
+        h = sigmoid(datamatrix*weights)
+        error = labelmat-h
+        weights =weights +alpha*datamatrix.transpose()*error
+    return weights
+
+
+def stogradascend(datamat,classlabels,numiter = 150):
+    m, n = np.shape(datamat)
+    weights = np.ones(n)
+    for j in range(numiter):
+        for i in range(m):
+            alpha = 4/(1+j+i)+0.01
+            randindex = int(np.random.uniform(0,len(datamat)))
+            h = sigmoid(sum(datamat[randindex]*weights))
+            error = classlabels[randindex] -h
+            weights = weights + alpha*error*datamat[randindex]
+            del(datamat[randindex])
+    return weights
