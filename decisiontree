@@ -1,0 +1,146 @@
+import numpy as np
+
+
+def calshannonent(dataset):
+    numentries = len(dataset)   #总量
+    labelcount = {}
+    for featvec in dataset:
+        currentlabel = featvec[-1]
+        if currentlabel not in labelcount.keys():
+            labelcount[currentlabel] = 0
+        labelcount[currentlabel] += 1     #计算频度
+    shannonent = 0
+    for key in labelcount:
+        prob = float(labelcount[key])/numentries
+        shannonent -= prob*np.log(prob, 2)
+    return shannonent
+
+
+def splitdataset(dataset, axis, val):
+    retdataset = []
+    for featvec in dataset:
+        if featvec[axis] == val:
+            reducefeatvec = featvec[:axis]
+            reducefeatvec.extend(featvec[axis+1:])
+            retdataset.append(reducefeatvec)
+    return retdataset   #miuns the feature
+
+
+def choosebestfeature(dataset):
+    numfeatures = len(dataset[0])-1
+    baseent = calshannonent(dataset)
+    bestinfgain = 0
+    bestfeature = -1
+    for i in range(numfeatures):
+        featlist = [example[i] for example in dataset]
+        uniqueval = set(featlist)
+        newent = 0         #build unique label
+        for value in uniqueval:
+            subdataset = splitdataset(dataset, i, value)
+            prob = len(subdataset)/float(len(dataset))
+            newent += prob*calshannonent(subdataset)   #gain the entrophy of label
+        infogain = baseent - newent   #formulstion
+        if infogain > bestfeature:
+            bestinfgain = infogain
+            bestfeature = i
+    return bestfeature
+
+
+import operator
+def majoritycnt(classlist):
+    classcount = {}
+    for vote in classlist:
+        if vote not in classcount.keys():
+            classcount[vote] += 1
+    sortedclasscount = sorted(classcount.items(),key=lambda x: x[1],reverse=True)
+    return sortedclasscount
+
+
+def createtree(dataset,labels):
+    classlist = [example[-1] for example in dataset]
+    if classlist.count(classlist[0]) == len(classlist):
+        return classlist[0]        #类别相同
+    if len(dataset[0]) == 1:
+        return majoritycnt(classlist)
+    bestfeat = choosebestfeature(dataset)
+    bestfeatlabel = labels[bestfeat]
+    mytree = {bestfeatlabel:{}}
+    del labels[bestfeat]        #删除已经找到的最佳标签
+    featvalue = [example[bestfeat] for example in dataset]
+    uniqueval = set(featvalue)
+    for value in uniqueval:
+        sublabels = labels[:]
+        mytree[bestfeatlabel][value] = createtree(splitdataset(dataset,bestfeat,value),sublabels)
+    return mytree
+
+#cart
+class treenode():
+    def __init__(self,feat,val,right,left):
+        self.feature = feat
+        self.value = val
+        self.left = left
+        self.right = right
+#找到最佳的待切分特征
+#   如果不能再切分，将该节点存为叶节点
+#   执行二元切分
+#   在右子树调用createtree
+#   在左子树调用createtree
+def binsplitdata(dataset,feature,value):
+    mat0 = dataset[np.nonzero(dataset[:, feature] > value)[0], :][0]   #nonzero仅仅返回数组的非0索引
+    mat1 = dataset[np.nonzero(dataset[:, feature] <= value)[0], :][0]
+    return mat0,mat1
+
+
+
+#对每个特征：
+#    对每个特征值：
+#          将数据集切分成两份
+#          计算切分的误差
+#          如果当前误差小于当前最小误差，那么将当前切分设定为最佳切分并更新最小误差
+#   返回最佳切分的特征和阈值
+def regleaf(dataset):            #得到叶节点的值 （均值
+    return np.mean(dataset[:, -1])
+
+
+def regerr(dataset):        #平方误差
+    return np.var(dataset[:,-1])*np.shape(dataset)[0]
+
+
+def choosebestsplit(dataset,leaftype=regleaf,errtype=regerr,ops=(1,4)):
+    tols = ops[0]          #误差下降值
+    toln = ops[1]          #最少样本数量
+    if len(set(dataset[:, -1].T.tolist()[0])) == 1:
+        return None, leaftype(dataset)
+    m, n = np.shape(dataset)
+    s = errtype(dataset)
+    bests = float('inf')
+    bestindex = 0
+    bestvalue = 0
+    for featindex in range(n-1):
+        for splitval in set(dataset[:, featindex]):
+            mat0, mat1 = binsplitdata(dataset,featindex,splitval)
+            if np.shape(mat0)[0] < toln or np.shape(mat1)[0] < toln : continue
+            news = errtype(mat0) + errtype(mat1)
+            if news < bests:
+                bestindex = featindex
+                bestvalue = splitval
+                bests = news
+    if (s-bests) < tols:
+        return None, leaftype(dataset)
+    mat0, mat1 = binsplitdata(dataset,bestindex,bestvalue)
+    if np.shape(mat0)[0] < toln or np.shape(mat1)[0] < toln:
+        return None, leaftype(dataset)
+    return bestindex, bestvalue
+
+
+def createtree(dataset, leaftype=regleaf, errtype=regerr, ops=(1,4)):
+    feat, val = choosebestsplit(dataset, leaftype, errtype, ops)
+    if feat == None:
+        return val
+    rettree = {}
+    rettree['spind'] =feat
+    rettree['spval'] = val
+    lset,rset = binsplitdata(dataset,feat,val)
+    rettree['left'] = createtree(lset,leaftype,errtype,ops)
+    rettree['right'] = createtree(rset,leaftype,errtype,ops)
+    return rettree
